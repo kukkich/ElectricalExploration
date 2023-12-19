@@ -209,7 +209,7 @@ internal class Program
     {
         const int groundStepsY = 800;
         const int airStepsY = 180;
-        const int xSteps = 50;
+        const int xSteps = 100;
 
         var grid = new GridBuilder()
             .SetYAxis(new AxisSplitParameter(new double[]

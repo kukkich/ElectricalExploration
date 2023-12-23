@@ -43,49 +43,61 @@ internal class Program
 
         var testAreas = new Dictionary<string, Rectangle>
         {
-            ["Top\\S"] = new (
-                1_300d, -700d,
-                500d, 200d
+            // ["Top\\S"] = new (
+            //     1_300d, -700d,
+            //     500d, 200d
+            // ),
+            // ["Top\\M"] = new(
+            //     1_300d, -1000d,
+            //     500d, 500d
+            // ),
+            // ["Top\\L"] = new(
+            //     1_300d, -1300d,
+            //     500d, 800d
+            // ),
+            // ["Middle\\S"] = new(
+            //     1_300d, -2200d,
+            //     500d, 200d
+            // ),
+            // ["Middle\\M"] = new(
+            //     1_300d, -2500d,
+            //     500d, 500d
+            // ),
+            // ["Middle\\L"] = new(
+            //     1_300d, -2800d,
+            //     500d, 800d
+            // ),
+            // ["Bottom\\S"] = new(
+            //     1_300d, -4000d,
+            //     500d, 200d
+            // ),
+            // ["Bottom\\M"] = new(
+            //     1_300d, -4300d,
+            //     500d, 500d
+            // ),
+            // ["Bottom\\L"] = new(
+            //     1_300d, -4600d,
+            //     500d, 800d
+            // ),
+            //["uniform"] = new (
+            //     0d, -5000d,
+            //     4000d, 5000d
+            // ),
+            //["Bottom"] = new(
+            //    9_750d, -2000d,
+            //    500d, 1000d
+            //),
+            ["Middle"] = new(
+                9_750d, -100d,
+                250d, 250d
             ),
-            ["Top\\M"] = new(
-                1_300d, -1000d,
-                500d, 500d
-            ),
-            ["Top\\L"] = new(
-                1_300d, -1300d,
-                500d, 800d
-            ),
-            ["Middle\\S"] = new(
-                1_300d, -2200d,
-                500d, 200d
-            ),
-            ["Middle\\M"] = new(
-                1_300d, -2500d,
-                500d, 500d
-            ),
-            ["Middle\\L"] = new(
-                1_300d, -2800d,
-                500d, 800d
-            ),
-            ["Bottom\\S"] = new(
-                1_300d, -4000d,
-                500d, 200d
-            ),
-            ["Bottom\\M"] = new(
-                1_300d, -4300d,
-                500d, 500d
-            ),
-            ["Bottom\\L"] = new(
-                1_300d, -4600d,
-                500d, 800d
-            ),
-            ["default"] = new (
-                0d, -5000d,
-                4000d, 5000d
-            )
+            //["Top"] = new(
+            //    9_875d, -100d,
+            //    250d, 250d
+            //),
         };
         var targetMaterial = 14;
-        foreach (var keyValue in testAreas.Where(kv => kv.Key == "default"))
+        foreach (var keyValue in testAreas)
         {
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"========================={keyValue.Key}=========================");
@@ -93,7 +105,7 @@ internal class Program
         
             var timer = new Stopwatch();
             timer.Start();
-            for (int materialId = 1; materialId <= 1; materialId++)
+            for (int materialId = 5; materialId <= 5; materialId++)
             {
                 //var testKey = keyValue.Key;
                 var areas = new AreasMaterialSetterFactory(new IMaterialArea<Point>[]
@@ -113,16 +125,16 @@ internal class Program
                         //     ),
                         //     13
                         // ),
-                        // new RectSection(keyValue.Value, materialId),
+                        new RectSection(keyValue.Value, materialId),
                         new RectSection(
                             new Rectangle(
                                 0d, 0d,
-                                4000d, 5000d
+                                40_000d, 5000d
                             ),
                             0
                         ),
                     },
-                    defaultMaterialIdId: materialId
+                    defaultMaterialIdId: 1
                 );
                 RunTestAndWriteResults(materialId, areas, keyValue.Key);
             }
@@ -140,20 +152,37 @@ internal class Program
 
     private static void RunTestAndWriteResults(int targetMaterial, AreasMaterialSetterFactory areas, string folder)
     {
-        int maxDegreeOfParallelism = 4;
+        int maxDegreeOfParallelism = 2;
         var ws = new[]
         {
-             1e-4, 2e-4, 5e-4, 7e-4,
-             1e-3, 2e-3, 5e-3, 7e-3,
-             1e-2, 2e-2, 5e-2, 7e-2,
-             1e-1, 2e-1, 5e-1, 7e-1,
-             1e-0, 2e-0,
-             5e-0, 7e-0,
-            // 10
+             //1e-4, 2e-4,
+             //5e-4, 7e-4,
+             1e-3, 2e-3,
+             5e-3, 7e-3,
+             1e-2,
+             5e-2,
+             1e-1, 5e-1,
+             1e-0, 5e-0, 1e+1,
+             2e+1, 5e+1, 7e+1,
+             1e+2, 2e+2, 5e+2, 7e+2,
+             1e+3,
+             //2e+3, 5e+3,
+             //7e+3,
         };
-        foreach (var h in new double[] {9000, 13000, 18000, 30000, 50000, 90000})
+        for (int i = 0; i < ws.Length; i++)
         {
-            var pathBase = "C:\\Users\\vitia\\PycharmProjects\\InverseTasks\\Impedance\\";
+            ws[i] /= 2 * Math.PI;
+        }
+        var hs = new double[]
+        {
+            //9000, 13000, 18000, 
+            //30000, 
+            //50000,
+            200_000
+        };
+        foreach (var h in hs)
+        {
+            var pathBase = "C:\\Users\\vitia\\PycharmProjects\\InverseTasks\\finnalyTetst\\2D Graphs";
             // + folder;
 
             var material = LayersTest.Materials;
@@ -162,9 +191,8 @@ internal class Program
                 .Replace(".", String.Empty)
                 .Replace("00", String.Empty);
             Console.WriteLine(sigmaPathPostFix);
-            var fullPath = pathBase + $"{h}_sigma={sigmaPathPostFix}.txt";
+            var fullPath = pathBase + $"{folder}_{h}_sigma={sigmaPathPostFix}.txt";
             // + ".txt";
-
 
             Console.WriteLine(fullPath);
             using var stream = new StreamWriter(fullPath);
@@ -207,30 +235,31 @@ internal class Program
 
     private static (double[] Z, double[] x) RunResultTest(double w, AreasMaterialSetterFactory areas, double h)
     {
-        const int groundStepsY = 800;
-        const int airStepsY = 180;
-        const int xSteps = 100;
+        const int groundStepsY = 400;
+        const int airStepsY = 100;
+        const int xSteps = 50;
 
         var grid = new GridBuilder()
             .SetYAxis(new AxisSplitParameter(new double[]
             {
                 -h, 0, 5000
             },
-                new ProportionalSplitter(groundStepsY, 1d / 1.001), 
-                new ProportionalSplitter(airStepsY, 1.05)
+                new ProportionalSplitter(groundStepsY, 1d / 1.05), 
+                new ProportionalSplitter(airStepsY, 1.1)
             ))
             .SetXAxis(new AxisSplitParameter(new double[]
             {
-                0, 4_000
-            }, 
-                new UniformSplitter(xSteps)
+                0, 9750, 40_000
+            },
+                new ProportionalSplitter(xSteps, 1d / 1.1),
+                new ProportionalSplitter(xSteps, 1.1)
             ))
             .SetMaterialSetterFactory(areas)
             .Build();
         
         var test = new LayersTest()
             .SetFrequency(w)
-            .SetSizes(new Size(xSteps, groundStepsY + airStepsY))
+            .SetSizes(new Size(2*xSteps, groundStepsY + airStepsY))
             .SetGrid(grid);
 
         var context = test.Run();
@@ -245,7 +274,6 @@ internal class Program
         var profileSolver = new LUProfile();
         profileSolver.Solve(equationProfile);
         var solution = new ImpedanceSolution(context.Grid, context.Materials, equationProfile.Solution);
-
         //var preconditioner = new LUPreconditioner();
         //var luSparse = new LUSparse(preconditioner);
         //var solver = new LocalOptimalScheme(preconditioner, luSparse, config);
@@ -255,14 +283,19 @@ internal class Program
         // var solution = new FiniteElementSolution2DHarmonic(context.Grid, context.Materials, context.Equation.Solution);
 
         // var groundNodes = grid.Nodes.Skip(groundIndexes[0]).Take(groundIndexes.Count).ToArray();
-        var groundNodes = new UniformSplitter(20)
-            .EnumerateValues(new Interval(0d, 4_000d))
+        var groundNodes = new UniformSplitter(200)
+            .EnumerateValues(new Interval(0d, 40_000d))
             .Select(x => new Point(x, 0));
         var Z = groundNodes.Select(x =>
         {
             var z = solution.Calculate(x);
             return z * z * LayersTest.Lambda / w;
         }).ToArray();
+        if (double.IsNaN(Z[1]))
+        {
+            throw new Exception("Вырожденное решение");
+        }
+
         Console.WriteLine($"done: w = {w:E1}");
         return new(Z, groundNodes.Select(p => p.X).ToArray());
     }

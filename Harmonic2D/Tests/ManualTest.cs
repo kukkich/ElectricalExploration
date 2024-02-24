@@ -26,11 +26,10 @@ public class ManualTest
     public void Run()
     {
         var grid = new Grid<Point, Element>(
-            new List<Point>
-            {
-                new(-1, -2 * 1e5), new(-1, -1e5), new(-1, -2 * 1e4), new(-1, -1e4), new(-1, 0),
-                new(0, -2 * 1e5), new(0, -1e5), new(0, -2 * 1e4), new(0, -1e4), new(0, 0),
-            },
+            new PointsCollection(
+                new [] {-1, 0d},
+                new [] {-2 * 1e5, -1e5, -2 * 1e4, -1e4, 0}
+            ),
             new List<Element>
             {
                 new(new[] {0, 1, 5, 6}, 1e5, 1, 0),

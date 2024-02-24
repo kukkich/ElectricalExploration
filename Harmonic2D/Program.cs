@@ -34,6 +34,7 @@ namespace Harmonic2D;
 
 internal class Program
 {
+    private static object ParallelLock = new();
     static void Main(string[] args)
     {
         Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
@@ -83,18 +84,18 @@ internal class Program
             //     0d, -5000d,
             //     4000d, 5000d
             // ),
-            //["Bottom"] = new(
-            //    9_750d, -2000d,
-            //    500d, 1000d
-            //),
-            ["Middle"] = new(
-                9_750d, -100d,
-                250d, 250d
+            ["Bottom"] = new(
+                9_750d, -2000d,
+                500d, 1000d
             ),
-            //["Top"] = new(
-            //    9_875d, -100d,
-            //    250d, 250d
-            //),
+            ["Middle"] = new(
+                9_750d, -350d,
+                500d, 250d
+            ),
+            ["Top"] = new(
+                9_750d, -280d,
+                500d, 250d
+            ),
         };
         var targetMaterial = 14;
         foreach (var keyValue in testAreas)
@@ -102,10 +103,17 @@ internal class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"========================={keyValue.Key}=========================");
             Console.ResetColor();
-        
+
             var timer = new Stopwatch();
             timer.Start();
-            for (int materialId = 5; materialId <= 5; materialId++)
+
+            var materialIds = new int[]
+            {
+                5, 6, 7, 8,
+                9, 10, 11, 12,
+                13, 14
+            };
+            foreach (var materialId in materialIds)
             {
                 //var testKey = keyValue.Key;
                 var areas = new AreasMaterialSetterFactory(new IMaterialArea<Point>[]
@@ -143,16 +151,18 @@ internal class Program
             string elapsedTime = String.Format("{0:00}:{1:00}.{2:00}",
                 ts.Minutes, ts.Seconds,
                 ts.Milliseconds / 10);
-        
+
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"{keyValue.Key} Finished {elapsedTime}");
             Console.ResetColor();
         }
+
+        Console.ReadKey();
     }
 
     private static void RunTestAndWriteResults(int targetMaterial, AreasMaterialSetterFactory areas, string folder)
     {
-        int maxDegreeOfParallelism = 2;
+        int maxDegreeOfParallelism = 1;
         var ws = new[]
         {
              //1e-4, 2e-4,
@@ -162,9 +172,9 @@ internal class Program
              1e-2,
              5e-2,
              1e-1, 5e-1,
-             1e-0, 5e-0, 1e+1,
-             2e+1, 5e+1, 7e+1,
-             1e+2, 2e+2, 5e+2, 7e+2,
+             1e-0, 2e-0, 3e-0, 5e-0, 7e-0, 9e-0,
+             1e+1, 2e+1, 3e+1, 5e+1, 7e+1, 9e+1,
+             1e+2, 2e+2, 3e+2, 5e+2, 7e+2, 9e+2,
              1e+3,
              //2e+3, 5e+3,
              //7e+3,
@@ -180,10 +190,30 @@ internal class Program
             //50000,
             200_000
         };
+        var xs = new double[]
+        {
+            10_000,
+            //10_250,
+            //10_500,
+            //10_750,
+            //11_000,
+            //11_500,
+            //12_000,
+            //13_000,
+            //14_000,
+            //14_000,
+            //17_000,
+            //20_000,
+            //30_000,
+            //40_000
+        };
+
         foreach (var h in hs)
         {
-            var pathBase = "C:\\Users\\vitia\\PycharmProjects\\InverseTasks\\finnalyTetst\\2D Graphs";
-            // + folder;
+            var pathBase = "C:\\Users\\vitia\\PycharmProjects\\InverseTasks\\finnalyTetst\\2D Graphs\\Sigma\\"
+                           + folder
+                           + "\\";
+            Console.WriteLine(pathBase);
 
             var material = LayersTest.Materials;
             var sigma = material[targetMaterial].Sigma;
@@ -191,36 +221,47 @@ internal class Program
                 .Replace(".", String.Empty)
                 .Replace("00", String.Empty);
             Console.WriteLine(sigmaPathPostFix);
-            var fullPath = pathBase + $"{folder}_{h}_sigma={sigmaPathPostFix}.txt";
-            // + ".txt";
-
-            Console.WriteLine(fullPath);
-            using var stream = new StreamWriter(fullPath);
-            WriteValuesString(stream, ws);
 
             var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
-            var dict = new ConcurrentDictionary<int, (double[] Z, double[] x)>();
-
+            var results = new List<double[]>(xs.Length);
+            for (var i = 0; i < xs.Length; i++)
             {
-                var testResult = RunResultTest(ws[0], areas, h);
-                WriteValuesString(stream, testResult.x);
-                dict.TryAdd(0, testResult);
-                Console.WriteLine($"WRITTEN!");
+                results.Add(new double[ws.Length]);
             }
 
-            Parallel.For(1, ws.Length, options, i =>
+            var progress = 0;
+            Parallel.For(0, ws.Length, options, i =>
             {
                 var testResult = RunResultTest(ws[i], areas, h);
-                dict.TryAdd(i, testResult);
-            });
+                for (var j = 0; j < xs.Length; j++)
+                {
+                    var z = testResult.Calculate(new Point(xs[j], 0));
+                    var R = z * z * LayersTest.Lambda / ws[i];
+                    if (double.IsNaN(R))
+                    {
+                        throw new Exception("Вырожденное решение");
+                    }
 
-            for (int i = 0; i < ws.Length; i++)
+                    results[j][i] = R;
+                }
+
+                lock (ParallelLock)
+                {
+                    Console.WriteLine($"[{++progress}/{ws.Length}] {ws[i]:E1} Complete");
+                }
+            });
+            for (int i = 0; i < xs.Length; i++)
             {
-                WriteValuesString(stream, dict[i].Z);
-                Console.WriteLine($"WRITTEN!");
+                var fullPath = pathBase + $"sigma={sigmaPathPostFix}_" + $"x={xs[i]}.txt";
+                using var stream = new StreamWriter(fullPath);
+                Console.WriteLine($"Writing...");
+                stream.WriteLine(xs[i]);
+                WriteValuesString(stream, ws);
+                WriteValuesString(stream, results[i]);
+
+                Console.WriteLine($"Written.");
             }
         }
-        
     }
 
     private static void WriteValuesString(StreamWriter stream, double[] a)
@@ -233,7 +274,7 @@ internal class Program
         stream.WriteLine($"{a[^1]:E15}");
     }
 
-    private static (double[] Z, double[] x) RunResultTest(double w, AreasMaterialSetterFactory areas, double h)
+    private static ImpedanceSolution RunResultTest(double w, AreasMaterialSetterFactory areas, double h)
     {
         const int groundStepsY = 400;
         const int airStepsY = 100;
@@ -244,22 +285,22 @@ internal class Program
             {
                 -h, 0, 5000
             },
-                new ProportionalSplitter(groundStepsY, 1d / 1.05), 
+                new ProportionalSplitter(groundStepsY, 1d / 1.05),
                 new ProportionalSplitter(airStepsY, 1.1)
             ))
             .SetXAxis(new AxisSplitParameter(new double[]
             {
                 0, 9750, 40_000
             },
-                new ProportionalSplitter(xSteps, 1d / 1.1),
-                new ProportionalSplitter(xSteps, 1.1)
+                new ProportionalSplitter(xSteps, 1d / 1.5),
+                new ProportionalSplitter(xSteps, 1.5)
             ))
             .SetMaterialSetterFactory(areas)
             .Build();
-        
+
         var test = new LayersTest()
             .SetFrequency(w)
-            .SetSizes(new Size(2*xSteps, groundStepsY + airStepsY))
+            .SetSizes(new Size(2 * xSteps, groundStepsY + airStepsY))
             .SetGrid(grid);
 
         var context = test.Run();
@@ -283,21 +324,9 @@ internal class Program
         // var solution = new FiniteElementSolution2DHarmonic(context.Grid, context.Materials, context.Equation.Solution);
 
         // var groundNodes = grid.Nodes.Skip(groundIndexes[0]).Take(groundIndexes.Count).ToArray();
-        var groundNodes = new UniformSplitter(200)
-            .EnumerateValues(new Interval(0d, 40_000d))
-            .Select(x => new Point(x, 0));
-        var Z = groundNodes.Select(x =>
-        {
-            var z = solution.Calculate(x);
-            return z * z * LayersTest.Lambda / w;
-        }).ToArray();
-        if (double.IsNaN(Z[1]))
-        {
-            throw new Exception("Вырожденное решение");
-        }
 
-        Console.WriteLine($"done: w = {w:E1}");
-        return new(Z, groundNodes.Select(p => p.X).ToArray());
+
+        return solution;
     }
 
     private static void RunTest()

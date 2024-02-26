@@ -30,28 +30,28 @@ public class LayersTest
     private readonly Material[] _material = Materials.ToArray();
     public static Material[] Materials => new Dictionary<int, Material>
     {
-        [0] = new() { Lambda = Lambda, Omega = 1, Sigma = 0 },
-        [1] = new() { Lambda = Lambda, Omega = 1, Sigma = 1e-3 },
-        [2] = new() { Lambda = Lambda, Omega = 1, Sigma = 2e-3 },
-        [3] = new() { Lambda = Lambda, Omega = 1, Sigma = 5e-3 },
-        [4] = new() { Lambda = Lambda, Omega = 1, Sigma = 7e-3 },
+        [0] = new() { Lambda = Lambda, Sigma = 0 },
+        [1] = new() { Lambda = Lambda, Sigma = 1e-3 },
+        [2] = new() { Lambda = Lambda, Sigma = 2e-3 },
+        [3] = new() { Lambda = Lambda, Sigma = 5e-3 },
+        [4] = new() { Lambda = Lambda, Sigma = 7e-3 },
 
-        [5] = new() { Lambda = Lambda, Omega = 1, Sigma = 1e-2 },
-        [6] = new() { Lambda = Lambda, Omega = 1, Sigma = 2e-2 },
-        [7] = new() { Lambda = Lambda, Omega = 1, Sigma = 5e-2 },
-        [8] = new() { Lambda = Lambda, Omega = 1, Sigma = 7e-2 },
+        [5] = new() { Lambda = Lambda, Sigma = 1e-2 },
+        [6] = new() { Lambda = Lambda, Sigma = 2e-2 },
+        [7] = new() { Lambda = Lambda, Sigma = 5e-2 },
+        [8] = new() { Lambda = Lambda, Sigma = 7e-2 },
 
-        [9] = new() { Lambda = Lambda, Omega = 1, Sigma = 1e-1 },
-        [10] = new() { Lambda = Lambda, Omega = 1, Sigma = 2e-1 },
-        [11] = new() { Lambda = Lambda, Omega = 1, Sigma = 5e-1 },
-        [12] = new() { Lambda = Lambda, Omega = 1, Sigma = 7e-1 },
+        [9] = new() { Lambda = Lambda, Sigma = 1e-1 },
+        [10] = new() { Lambda = Lambda, Sigma = 2e-1 },
+        [11] = new() { Lambda = Lambda, Sigma = 5e-1 },
+        [12] = new() { Lambda = Lambda, Sigma = 7e-1 },
 
-        [13] = new() { Lambda = Lambda, Omega = 1, Sigma = 1 },
-        [14] = new() { Lambda = Lambda, Omega = 1, Sigma = 2 },
-        [15] = new() { Lambda = Lambda, Omega = 1, Sigma = 5 },
-        [16] = new() { Lambda = Lambda, Omega = 1, Sigma = 7 },
+        [13] = new() { Lambda = Lambda, Sigma = 1 },
+        [14] = new() { Lambda = Lambda, Sigma = 2 },
+        [15] = new() { Lambda = Lambda, Sigma = 5 },
+        [16] = new() { Lambda = Lambda, Sigma = 7 },
 
-        [17] = new() { Lambda = Lambda, Omega = 1, Sigma = 10 },
+        [17] = new() { Lambda = Lambda, Sigma = 10 },
     }.Select(kv => kv.Value).ToArray();
     public LayersTest SetGrid(Grid<Point, Element> grid)
     {
@@ -61,10 +61,7 @@ public class LayersTest
 
     public LayersTest SetFrequency(double w)
     {
-        for (int i = 0; i < _material.Length; i++)
-        {
-            _material[i].Omega = w;
-        }
+        _w = w;
         return this;
     }
     public LayersTest SetSizes(Size size)
@@ -84,12 +81,12 @@ public class LayersTest
         return context;
     }
 
-    private Context<Point, Element, SparseMatrix> CreateContext()
+    private HarmonicContext<Point, Element, SparseMatrix> CreateContext()
     {
         IMatrixPortraitBuilder<SparseMatrix, Element> portraitBuilder = new MatrixPortraitBuilder();
         var matrix = portraitBuilder.Build(_grid.Elements, _grid.Nodes.Length);
 
-        var context = new Context<Point, Element, SparseMatrix>
+        var context = new HarmonicContext<Point, Element, SparseMatrix>
         {
             Grid = _grid,
             Equation = new Equation<SparseMatrix>(
@@ -101,6 +98,7 @@ public class LayersTest
             DensityFunctionProvider = null,
             FirstConditions = null,
             SecondConditions = null,
+            Frequency = _w
         };
 
         context.DensityFunctionProvider = new AnalyticComplexDensity(context, p => new (0,0));
@@ -109,13 +107,13 @@ public class LayersTest
 
         return context;
     }
-    private EquationAssembler CreateAssembler(Context<Point, Element, SparseMatrix> context)
+    private EquationAssembler CreateAssembler(HarmonicContext<Point, Element, SparseMatrix> context)
     {
         var inserter = new Inserter();
 
         return new EquationAssembler(
             context,
-            new LocalAssembler(context),
+            new HarmonicLocalAssembler(context),
             inserter,
             new GaussExcluderSparse(),
             new SecondBoundaryApplier(context, inserter)

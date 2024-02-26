@@ -9,7 +9,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharpMath", "..\..\C#\Proje
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharpMath.Tests", "..\..\C#\Projects\SharpMath\SharpMath.Tests\SharpMath.Tests.csproj", "{9E10D41D-3B19-4DAA-B8AA-467D11317B25}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InverseTask", "InverseTask\InverseTask.csproj", "{0E3539BE-1819-4637-A6BA-8F505BDF522E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "InverseTask", "InverseTask\InverseTask.csproj", "{0E3539BE-1819-4637-A6BA-8F505BDF522E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1643F7AA-48D6-4B56-A7DF-BE49FFE0D998} = {1643F7AA-48D6-4B56-A7DF-BE49FFE0D998}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

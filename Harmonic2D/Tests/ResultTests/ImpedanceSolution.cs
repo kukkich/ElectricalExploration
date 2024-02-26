@@ -1,7 +1,5 @@
 ﻿using System.Numerics;
 using SharpMath.FiniteElement._2D;
-using SharpMath.FiniteElement.Core.Assembling.Params;
-using SharpMath.FiniteElement.Materials.HarmonicWithoutChi;
 using SharpMath.Geometry;
 using SharpMath.Geometry._2D;
 using Vector = SharpMath.Vectors.Vector;
@@ -11,27 +9,31 @@ namespace Harmonic2D.Tests.ResultTests;
 public class ImpedanceSolution
 {
     private readonly Grid<Point, Element> _grid;
-    private readonly IMaterialProvider<Material> _materials;
     private readonly Vector _weights;
-    private const double zDerivativeStep = 1e-5;
-    public ImpedanceSolution(Grid<Point, Element> grid, IMaterialProvider<Material> materials, Vector weights)
+    private readonly double _frequency;
+
+    public ImpedanceSolution(
+        Grid<Point, Element> grid,
+        Vector weights,
+        double frequency
+    )
     {
         _grid = grid;
-        _materials = materials;
         _weights = weights;
+        _frequency = frequency;
     }
 
     public double Calculate(Point point)
     {
         var element = _grid.Elements.First(x => ElementHas(x, point));
-        var material = _materials.GetById(element.MaterialId);
         
         var u = GetFunctionComponents(point, element);
-        var electricity = material.Omega * u.Magnitude;
+        var electricity = _frequency * u.Magnitude;
 
         var uDerivative = GetDerivativeFunctionComponents(point, element);
         var magnetic = LayersTest.Lambda * uDerivative.Magnitude;
         var result = electricity / magnetic;
+
         return result;
     }
 
@@ -69,6 +71,7 @@ public class ImpedanceSolution
 
         return new Complex(us, uc);
     }
+
     private Complex GetDerivativeFunctionComponents(Point point, Element element)
     {
         var leftBottom = _grid.Nodes[element.NodeIndexes[0]];
@@ -94,7 +97,7 @@ public class ImpedanceSolution
 
         var (us, uc) = (0d, 0d);
 
-        for (int i = 0; i < 4; i++)
+        for (var i = 0; i < 4; i++)
         {
             var nodeIndex = element.NodeIndexes[i];
             us += _weights[nodeIndex * 2] * basicValues[i];
@@ -112,5 +115,4 @@ public class ImpedanceSolution
         return leftBottom.X <= node.X && node.X <= rightTop.X && 
                leftBottom.Y <= node.Y && node.Y <= rightTop.Y;
     }
-
 }

@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Numerics;
-using System.Security.Cryptography.X509Certificates;
 using SharpMath;
 using SharpMath.FiniteElement;
 using SharpMath.FiniteElement._2D;
@@ -149,13 +148,13 @@ public class TestBuilder
         context.SecondConditions = CreateSecond();
         return context;
     }
-    private EquationAssembler CreateAssembler(Context<Point, Element, SparseMatrix> context)
+    private EquationAssembler CreateAssembler(HarmonicContext<Point, Element, SparseMatrix> context)
     {
         var inserter = new Inserter();
 
         return new EquationAssembler(
             context,
-            new LocalAssembler(context),
+            new HarmonicLocalAssembler(context),
             inserter,
             new GaussExcluderSparse(),
             new SecondBoundaryApplier(context, inserter)

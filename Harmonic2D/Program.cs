@@ -25,10 +25,9 @@ using static System.Math;
 using Harmonic2D.Tests.ResultTests;
 using Point = SharpMath.Geometry._2D.Point;
 using Rectangle = SharpMath.Geometry._2D.Rectangle;
-using System.IO;
 using SharpMath.Matrices.Converters;
-using System.Collections.Concurrent;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Harmonic2D;
 
@@ -314,7 +313,7 @@ internal class Program
         var equationProfile = new Equation<ProfileMatrix>(profile, context.Equation.Solution, context.Equation.RightSide);
         var profileSolver = new LUProfile();
         profileSolver.Solve(equationProfile);
-        var solution = new ImpedanceSolution(context.Grid, context.Materials, equationProfile.Solution);
+        var solution = new ImpedanceSolution(context.Grid, equationProfile.Solution, w);
         //var preconditioner = new LUPreconditioner();
         //var luSparse = new LUSparse(preconditioner);
         //var solver = new LocalOptimalScheme(preconditioner, luSparse, config);
@@ -329,43 +328,11 @@ internal class Program
         return solution;
     }
 
-    private static void RunTest()
-    {
-        double UExpected(Point p, double t) => (p.X * p.X + p.Y * p.Y) * Sin(t) + (p.X * p.X - p.Y * p.Y) * Cos(t);
-        var context = ConvergenceTests.Square(32, 32);
-
-        var config = new LocalOptimalSchemeConfig
-        {
-            Eps = 1e-15,
-            MaxIterations = 1000
-        };
-        var preconditioner = new LUPreconditioner();
-        var luSparse = new LUSparse(preconditioner);
-        var solver = new LocalOptimalScheme(preconditioner, luSparse, config);
-        solver.Solve(context.Equation);
-        var solution = new FiniteElementSolution2DHarmonic(context.Grid, context.Materials, context.Equation.Solution);
-
-        //var profile = MatrixConverter.Convert(context.Equation.Matrix);
-        // var equationProfile =
-        //    new Equation<ProfileMatrix>(profile, context.Equation.Solution, context.Equation.RightSide);
-        //var profileSolver = new LUProfile();
-        //profileSolver.Solve(equationProfile);
-
-        //var solutionProfile = new FiniteElementSolution2DHarmonic(context.Grid, context.Materials, equationProfile.Solution);
-
-        var p = new Point(1 / 3d, 4 / 3d);
-        var t = PI / 8d;
-        var u = solution.Calculate(p, t);
-        //var v = solutionProfile.Calculate(p, t);
-        var expected = UExpected(p, t);
-        Console.WriteLine($"{u:F15} {expected:F15}");
-    }
-
-    static EquationAssembler CreateAssembler(Context<Point, Element, SparseMatrix> context)
+    static EquationAssembler CreateAssembler(HarmonicContext<Point, Element, SparseMatrix> context)
     {
         return new EquationAssembler(
             context,
-            new LocalAssembler(context),
+            new HarmonicLocalAssembler(context),
             new Inserter(),
             new GaussExcluderSparse(),
             new SecondBoundaryApplier(context, new Inserter())

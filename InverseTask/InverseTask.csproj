@@ -33,8 +33,5 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\..\..\C#\Projects\SharpMath\SharpMath\SharpMath.csproj" />
 	</ItemGroup>
-	<ItemGroup>
-	  <Folder Include="DirectTask\" />
-	</ItemGroup>
 
 </Project>

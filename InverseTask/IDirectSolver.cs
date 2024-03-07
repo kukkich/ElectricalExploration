@@ -9,11 +9,11 @@ namespace InverseTask;
 
 public interface IDirectSolver
 {
-    public Vector Solve(
+    public double[] Solve(
         Grid<Point, Element> grid,
         double frequency,
         IMaterialProvider<Material> materialProvider,
         Vector measuringPoints,
-        Vector resultMemory
+        double[] resultMemory
     );
 }

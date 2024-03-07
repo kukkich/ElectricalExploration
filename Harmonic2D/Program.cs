@@ -1,9 +1,7 @@
 ﻿using System.Drawing;
 using System.Globalization;
 using System.Numerics;
-using Harmonic2D.Tests;
 using SharpMath;
-using SharpMath.EquationsSystem.Preconditions;
 using SharpMath.EquationsSystem.Solver;
 using SharpMath.FiniteElement;
 using SharpMath.FiniteElement._2D;
@@ -12,7 +10,6 @@ using SharpMath.FiniteElement.Core.Assembling;
 using SharpMath.FiniteElement.Core.Assembling.Boundary.First;
 using SharpMath.FiniteElement.Core.Assembling.Boundary.Second;
 using SharpMath.FiniteElement.Core.Harmonic;
-using SharpMath.FiniteElement.Core.Harmonic.Solution;
 using SharpMath.FiniteElement.Materials.MaterialSetter.Areas;
 using SharpMath.FiniteElement.Materials.Providers;
 using SharpMath.FiniteElement.Providers.Density;
@@ -21,13 +18,13 @@ using SharpMath.Geometry._2D;
 using SharpMath.Geometry.Splitting;
 using SharpMath.Matrices.Sparse;
 using Vector = SharpMath.Vectors.Vector;
-using static System.Math;
 using Harmonic2D.Tests.ResultTests;
 using Point = SharpMath.Geometry._2D.Point;
 using Rectangle = SharpMath.Geometry._2D.Rectangle;
 using SharpMath.Matrices.Converters;
 using System.Diagnostics;
-using Microsoft.Extensions.Logging.Abstractions;
+using SharpMath.EquationsSystem.Preconditions;
+using SharpMath.FiniteElement.Core.Harmonic.Solution;
 
 namespace Harmonic2D;
 
@@ -314,15 +311,15 @@ internal class Program
         var profileSolver = new LUProfile();
         profileSolver.Solve(equationProfile);
         var solution = new ImpedanceSolution(context.Grid, equationProfile.Solution, w);
-        //var preconditioner = new LUPreconditioner();
-        //var luSparse = new LUSparse(preconditioner);
-        //var solver = new LocalOptimalScheme(preconditioner, luSparse, config);
-        //solver.Solve(context.Equation);
-        //var solution = new ImpedanceSolution(context.Grid, context.Materials, context.Equation.Solution);
-
-        // var solution = new FiniteElementSolution2DHarmonic(context.Grid, context.Materials, context.Equation.Solution);
-
-        // var groundNodes = grid.Nodes.Skip(groundIndexes[0]).Take(groundIndexes.Count).ToArray();
+        // var preconditioner = new LUPreconditioner();
+        // var luSparse = new LUSparse(preconditioner);
+        // var solver = new LocalOptimalScheme(preconditioner, luSparse, config);
+        // solver.Solve(context.Equation);
+        // var solution = new ImpedanceSolution(context.Grid, context.Materials, context.Equation.Solution);
+        //
+        //  var solution = new FiniteElementSolution2DHarmonic(context.Grid, context.Materials, context.Equation.Solution);
+        //
+        //  var groundNodes = grid.Nodes.Skip(groundIndexes[0]).Take(groundIndexes.Count).ToArray();
 
 
         return solution;

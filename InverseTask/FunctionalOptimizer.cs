@@ -135,7 +135,6 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         foreach (var (frequency, frequencyIndex) in Config.Frequencies)
         {
             _nextNumericalFunc[frequencyIndex] = _directSolver.Solve(
-                grid,
                 frequency,
                 currentMaterialProvider,
                 Config.MeasuringPoints,
@@ -179,7 +178,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         return functional;
     }
 
-    private void Allocate()
+    private void Allocate(Grid<Point, Element> grid)
     {
         _deviatedNumericalFunc = new double[Config.SigmaInitial.Length][][];
         for (var parameter = 0; parameter < _deviatedNumericalFunc.Length; parameter++)

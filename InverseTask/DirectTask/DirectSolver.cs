@@ -1,16 +1,13 @@
 ﻿using System.Numerics;
 using InverseTask.DirectTask.Result;
 using SharpMath;
-using SharpMath.EquationsSystem.Preconditions;
 using SharpMath.EquationsSystem.Solver;
-using SharpMath.FiniteElement;
 using SharpMath.FiniteElement._2D;
 using SharpMath.FiniteElement._2D.Assembling;
 using SharpMath.FiniteElement.Core.Assembling.Boundary.First;
 using SharpMath.FiniteElement.Core.Assembling.Boundary.Second;
 using SharpMath.FiniteElement.Core.Assembling.Params;
 using SharpMath.FiniteElement.Core.Harmonic;
-using SharpMath.FiniteElement.Core.Harmonic.Solution;
 using SharpMath.FiniteElement.Materials.HarmonicWithoutChi;
 using SharpMath.FiniteElement.Providers.Density;
 using SharpMath.Geometry;
@@ -27,7 +24,7 @@ public class DirectSolver : IDirectSolver
     private HarmonicContext<Point, Element, SparseMatrix> _context = null!;
     private EquationAssembler _assembler = null!;
 
-    private const double MagneticConstant = 4d * Math.PI * 1e-7;
+    public const double MagneticConstant = 4d * Math.PI * 1e-7;
 
     public DirectSolver(LocalOptimalSchemeConfig losConfig)
     {
@@ -47,9 +44,12 @@ public class DirectSolver : IDirectSolver
         double[] resultMemory
     )
     {
+        _context.Materials = materialProvider;
+        _context.Frequency = frequency;
+
         _assembler.BuildEquation(_context)
             .ApplySecondConditions(_context)
-        .ApplyFirstBoundary(_context);
+            .ApplyFirstBoundary(_context);
 
         var profile = MatrixConverter.Convert(_context.Equation.Matrix);
         var equationProfile = new Equation<ProfileMatrix>(profile, _context.Equation.Solution, _context.Equation.RightSide);

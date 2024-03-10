@@ -1,6 +1,7 @@
-﻿using SharpMath.Vectors;
+﻿using InverseTask.DirectTask.EquationSystem;
+using SharpMath.Vectors;
 
-namespace InverseTask.DirectTask.EquationSystem;
+namespace InverseTask.EquationSystem;
 
 public interface IParameterDirectionSLAESolver
 {

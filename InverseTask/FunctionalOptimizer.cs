@@ -15,6 +15,8 @@ namespace InverseTask;
 
 public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
 {
+    private int FixedMaterialsCount => _materials.Length - SigmaInitial.Length;
+
     private readonly IDirectSolver _directSolver;
     private readonly IParameterDirectionSLAESolver _slaeSolver;
 
@@ -31,7 +33,6 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
 
     private Vector _currentSigma;
     private Vector _nextSigma;
-
     private ParameterDirectionEquation _equation = null!;
     private Material[] _materials = null!;
 
@@ -58,17 +59,18 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         Vector measuringPoints,
         Matrix measurements,
         Vector frequencies,
-        Vector sigmaCurrent,
-        Vector alpha
+        Vector sigmaInitial,
+        Vector alpha,
+        Material[] fixedMaterials
         )
     {
         MeasuringPoints = measuringPoints;
         Measurements = measurements;
         Frequencies = frequencies;
-        SigmaInitial = sigmaCurrent;
+        SigmaInitial = sigmaInitial;
         Alpha = alpha;
 
-        Allocate(grid);
+        Allocate(grid, fixedMaterials);
         var currentMaterialProvider = new FromArrayMaterialProvider(_materials);
 
         // direct task
@@ -95,7 +97,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
                 var deviatedMaterialProvider = new SigmaDeviatedMaterialProvider(
                     currentMaterialProvider,
                     deviation,
-                    parameterIndex + 1 // +1 cause 0-th material is air
+                    FixedMaterialsCount + parameterIndex
                 );
 
                 _deviatedNumericalFunc[parameterIndex][frequencyIndex] = _directSolver.Solve(
@@ -198,7 +200,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         return functional;
     }
 
-    private void Allocate(Grid<Point, Element> grid)
+    private void Allocate(Grid<Point, Element> grid, Material[] fixedMaterials)
     {
         _deviatedNumericalFunc = new double[SigmaInitial.Length][][];
         for (var parameter = 0; parameter < _deviatedNumericalFunc.Length; parameter++)
@@ -230,11 +232,14 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
             ParameterInitial = SigmaInitial,
         };
 
-        _materials = new Material[SigmaInitial.Length + 1];
-        _materials[0] = new Material(FunctionalOptimizerConfig.Lambda, 0);
-        for (var i = 1; i < _materials.Length; i++)
+        _materials = new Material[fixedMaterials.Length + SigmaInitial.Length];
+        for (var i = 0; i < fixedMaterials.Length; i++)
         {
-            _materials[i] = new Material(FunctionalOptimizerConfig.Lambda, SigmaInitial[i-1]);
+            _materials[i] = fixedMaterials[i];
+        }
+        for (var i = 0; i < SigmaInitial.Length; i++)
+        {
+            _materials[fixedMaterials.Length + i] = new Material(FunctionalOptimizerConfig.Lambda, SigmaInitial[i]);
         }
 
         _directSolver.Allocate(grid);

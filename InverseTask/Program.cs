@@ -119,8 +119,12 @@ optimizer.Solve(
     measuringPoints,
     measurements,
     new Vector(frequency),
-    new Vector(1e-3, 1),
-    new Vector(1.5, 1.5)
+    sigmaInitial: new Vector(0.5),
+    alpha: new Vector(1.5),
+    fixedMaterials: [
+        new Material(lambda, 0),
+        new Material(lambda, 1e-3)
+    ]
 );
 Console.WriteLine("Hello, World!");
 Console.WriteLine(result[0]);

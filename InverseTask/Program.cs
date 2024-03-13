@@ -97,7 +97,7 @@ var materialProvider = new FromArrayMaterialProvider([
     new Material(lambda, 1e-3),
     new Material(lambda, 1)
 ]);
-var measuringPoints = new Vector(0d, 200, 400, 1000, 1500, 2000, 3300, 3700, 3950, 4000);
+var measuringPoints = new Vector(4000);
 var result = new double[measuringPoints.Length];
 solver.Solve(frequency, materialProvider, measuringPoints, result);
 
@@ -114,17 +114,18 @@ for (var i = 0; i < result.Length; i++)
     measurements[0, i] = result[i];
 }
 
+Console.WriteLine($"R* = {result[0]:E15}");
+
 optimizer.Solve(
     grid,
     measuringPoints,
     measurements,
     new Vector(frequency),
-    sigmaInitial: new Vector(0.5),
-    alpha: new Vector(1.5),
+    sigmaInitial: new Vector(1 - optimizer.GetDerivativeStep(1)),
+    alpha: new Vector(1e-7),
     fixedMaterials: [
         new Material(lambda, 0),
         new Material(lambda, 1e-3)
     ]
 );
-Console.WriteLine("Hello, World!");
 Console.WriteLine(result[0]);

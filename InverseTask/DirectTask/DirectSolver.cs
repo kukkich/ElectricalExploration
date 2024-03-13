@@ -46,6 +46,7 @@ public class DirectSolver : IDirectSolver
     {
         _context.Materials = materialProvider;
         _context.Frequency = frequency;
+        ResetEquation();
 
         _assembler.BuildEquation(_context)
             .ApplySecondConditions(_context)
@@ -154,5 +155,29 @@ public class DirectSolver : IDirectSolver
             new GaussExcluderSparse(),
             new SecondBoundaryApplier(context, inserter)
         );
+    }
+
+    private void ResetEquation()
+    {
+        for (var i = 0; i < _context.Equation.Matrix.Diagonal.Length; i++)
+        {
+            _context.Equation.Matrix.Diagonal[i] = 0;
+        }
+        for (var i = 0; i < _context.Equation.Matrix.LowerValues.Length; i++)
+        {
+            _context.Equation.Matrix.LowerValues[i] = 0;
+        }
+        for (var i = 0; i < _context.Equation.Matrix.UpperValues.Length; i++)
+        {
+            _context.Equation.Matrix.UpperValues[i] = 0;
+        }
+        for (var i = 0; i < _context.Equation.Solution.Length; i++)
+        {
+            _context.Equation.Solution[i] = 0;
+        }
+        for (var i = 0; i < _context.Equation.RightSide.Length; i++)
+        {
+            _context.Equation.RightSide[i] = 0;
+        }
     }
 }

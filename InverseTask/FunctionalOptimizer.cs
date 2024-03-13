@@ -2,6 +2,7 @@
 using InverseTask.DirectTask.EquationSystem;
 using InverseTask.EquationSystem;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
 using SharpMath;
 using SharpMath.FiniteElement._2D;
 using SharpMath.FiniteElement.Materials.HarmonicWithoutChi;
@@ -15,6 +16,8 @@ namespace InverseTask;
 
 public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
 {
+    public const double DerivativeStepScale = 0.2; 
+    
     private int FixedMaterialsCount => _materials.Length - SigmaInitial.Length;
 
     private readonly IDirectSolver _directSolver;
@@ -82,16 +85,17 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
                 MeasuringPoints,
                 resultMemory: _numericalFunc[frequencyIndex]
             );
+            Console.WriteLine($"R = {_numericalFunc[frequencyIndex][0]:E15}");
         }
         var prevFunctional = ComputeFunctional(_currentSigma, _numericalFunc);
 
         // deviated direct tasks
         for (var parameterIndex = 0; parameterIndex < SigmaInitial.Length; parameterIndex++)
         {
-
             var sigma = _currentSigma[parameterIndex];
-            var deviation = sigma / 10;
-
+            var deviation = GetDerivativeStep(sigma);
+            var deviatedSigma = sigma + deviation;
+            Console.WriteLine($"sigma + h = {deviatedSigma:E5}");
             foreach (var (frequency, frequencyIndex) in Frequencies)
             {
                 var deviatedMaterialProvider = new SigmaDeviatedMaterialProvider(
@@ -106,6 +110,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
                     MeasuringPoints,
                     resultMemory: _deviatedNumericalFunc[parameterIndex][frequencyIndex]
                 );
+                Console.WriteLine($"R(sigma + h) = {_deviatedNumericalFunc[parameterIndex][frequencyIndex][0]:E15}");
             }
         }
 
@@ -122,30 +127,36 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
             {
                 for (var pointIndex = 0; pointIndex < MeasuringPoints.Length; pointIndex++)
                 {
+                    var w = 1d / Math.Abs(Measurements[frequencyIndex, pointIndex]);
+                    var wSquare = w * w;
+
                     var ithParamDiff = -1d * (
                         _deviatedNumericalFunc[i][frequencyIndex][pointIndex] -
                         _numericalFunc[frequencyIndex][pointIndex]
-                    ) / (_currentSigma[i] / 10);
+                    ) / GetDerivativeStep(_currentSigma[i]);
                     for (var j = 0; j < SigmaInitial.Length; j++)
                     {
-
                         var jthParamDiff = -1d * (
                             _deviatedNumericalFunc[j][frequencyIndex][pointIndex] -
                             _numericalFunc[frequencyIndex][pointIndex]
-                        ) / (_currentSigma[j] / 10);
+                        ) / GetDerivativeStep(_currentSigma[j]);
 
-                        // TODO implement w coefficient
-                        _equation.A[i, j] += ithParamDiff * jthParamDiff;
+                        _equation.A[i, j] += wSquare * ithParamDiff * jthParamDiff;
                     }
 
                     var measuringDiff = Measurements[frequencyIndex, pointIndex] -
                                         _numericalFunc[frequencyIndex][pointIndex];
-                    // TODO implement w coefficient
-                    _equation.F[i] = ithParamDiff * measuringDiff;
+                    _equation.F[i] -= wSquare * ithParamDiff * measuringDiff;
                 }
             }
         }
-
+        
+        var s = _equation.F[0] / (_equation.A[0, 0] + _equation.Alpha[0]);
+        Console.WriteLine($"A = {_equation.A[0, 0]:E15}");
+        Console.WriteLine($"alpha = {_equation.Alpha[0]:E15}");
+        Console.WriteLine($"F = {_equation.F[0]:E15}");
+        Console.WriteLine($"delta sigma = {s:F10}");
+        return;
         var sigmaSeekDirection = _slaeSolver.Solve(_equation);
         _nextSigma = LinAl.LinearCombination(
             _currentSigma, sigmaSeekDirection, 
@@ -171,6 +182,11 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         }
     }
 
+    public double GetDerivativeStep(double sigma)
+    {
+        return 0.2;
+    }
+
     private double ComputeFunctional(Vector sigma, double[][] func)
     {
         var funcPunish = 0d;
@@ -180,8 +196,10 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
             {
                 var measuringDiff = Measurements[frequencyIndex, pointIndex] -
                                     func[frequencyIndex][pointIndex];
-                // TODO implement w coefficient
-                funcPunish += Math.Pow(measuringDiff, 2);
+
+                var w = 1d / Math.Abs(Measurements[frequencyIndex, pointIndex]);
+
+                funcPunish += Math.Pow(measuringDiff / w, 2);
             }
         }
 

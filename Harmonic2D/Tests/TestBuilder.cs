@@ -124,12 +124,12 @@ public class TestBuilder
         return context;
     }
 
-    private Context<Point, Element, SparseMatrix> CreateContext()
+    private HarmonicContext<Point, Element, SparseMatrix> CreateContext()
     {
         IMatrixPortraitBuilder<SparseMatrix, Element> portraitBuilder = new MatrixPortraitBuilder();
         var matrix = portraitBuilder.Build(_grid.Elements, _grid.Nodes.Length);
 
-        var context = new Context<Point, Element, SparseMatrix>
+        var context = new HarmonicContext<Point, Element, SparseMatrix>
         {
             Grid = _grid,
             Equation = new Equation<SparseMatrix>(
@@ -141,6 +141,7 @@ public class TestBuilder
             Materials = _material,
             FirstConditions = null,
             SecondConditions = null,
+            Frequency = 0
         };
 
         context.DensityFunctionProvider = new AnalyticComplexDensity(context, p => new Complex(_fSin(p), _fCos(p)));

@@ -1,8 +1,6 @@
 ﻿using InverseTask.DirectTask;
-using InverseTask.DirectTask.EquationSystem;
 using InverseTask.EquationSystem;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualBasic;
 using SharpMath;
 using SharpMath.FiniteElement._2D;
 using SharpMath.FiniteElement.Materials.HarmonicWithoutChi;

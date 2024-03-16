@@ -1,7 +1,9 @@
 ﻿using InverseTask;
 using InverseTask.DirectTask;
+using InverseTask.EquationSystem;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Serilog;
 using SharpMath.EquationsSystem.Solver;
@@ -28,19 +30,33 @@ void ConfigureServices(IServiceCollection services)
             .GetSection("LOS")
             .Get<LocalOptimalSchemeConfig>();
 
-        return losConfig;
+        return losConfig!;
     });
+    services.AddScoped<GaussZeidelConfig>(provider =>
+    {
+        provider.GetService<IConfiguration>();
+        var gaussZeidelConfig = configuration
+            .GetSection("App")
+            .GetSection("GaussZeidel")
+            .Get<GaussZeidelConfig>();
 
+        return gaussZeidelConfig!;
+    });
     services.AddSingleton(configuration);
 
+    services.AddScoped<GaussZeidelSolver>();
+    services.AddScoped<ParameterDirectionSLAESolver>();
+    
     Log.Logger = new LoggerConfiguration()
         .ReadFrom.Configuration(configuration)
         .CreateLogger();
-
     services.AddLogging(loggingBuilder =>
         loggingBuilder.AddSerilog(dispose: true));
 }
 
+var services = new ServiceCollection();
+ConfigureServices(services);
+var provider = services.BuildServiceProvider();
 
 var air = new RectSection(
     new Rectangle(
@@ -103,9 +119,9 @@ solver.Solve(frequency, materialProvider, measuringPoints, result);
 
 var optimizer = new FunctionalOptimizer(
     new FunctionalOptimizerConfig {Betta = 1d, MaxIteration = 10, Precision = 1e-4},
-    NullLogger.Instance,
+    provider.GetRequiredService<ILogger<FunctionalOptimizer>>(),
     solver,
-    null
+    provider.GetRequiredService<ParameterDirectionSLAESolver>()
     );
 
 var measurements = new Matrix(new double[1,result.Length]);
@@ -121,7 +137,7 @@ optimizer.Solve(
     measuringPoints,
     measurements,
     new Vector(frequency),
-    sigmaInitial: new Vector(1 - optimizer.GetDerivativeStep(1)),
+    sigmaInitial: new Vector(1 - 0.2),
     alpha: new Vector(1e-7),
     fixedMaterials: [
         new Material(lambda, 0),

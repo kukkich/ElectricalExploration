@@ -72,18 +72,17 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         Alpha = alpha;
 
         Allocate(grid, fixedMaterials);
-        var currentMaterialProvider = new FromArrayMaterialProvider(_materials);
+        var materialProvider = new FromArrayMaterialProvider(_materials);
 
         // direct task
         foreach (var (frequency, frequencyIndex) in Frequencies)
         {
             _numericalFunc[frequencyIndex] = _directSolver.Solve(
                 frequency,
-                currentMaterialProvider,
+                materialProvider,
                 MeasuringPoints,
                 resultMemory: _numericalFunc[frequencyIndex]
             );
-            Console.WriteLine($"R = {_numericalFunc[frequencyIndex][0]:E15}");
         }
         var prevFunctional = ComputeFunctional(_currentSigma, _numericalFunc);
 
@@ -92,12 +91,10 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         {
             var sigma = _currentSigma[parameterIndex];
             var deviation = GetDerivativeStep(sigma);
-            var deviatedSigma = sigma + deviation;
-            Console.WriteLine($"sigma + h = {deviatedSigma:E5}");
             foreach (var (frequency, frequencyIndex) in Frequencies)
             {
                 var deviatedMaterialProvider = new SigmaDeviatedMaterialProvider(
-                    currentMaterialProvider,
+                    materialProvider,
                     deviation,
                     FixedMaterialsCount + parameterIndex
                 );
@@ -108,7 +105,6 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
                     MeasuringPoints,
                     resultMemory: _deviatedNumericalFunc[parameterIndex][frequencyIndex]
                 );
-                Console.WriteLine($"R(sigma + h) = {_deviatedNumericalFunc[parameterIndex][frequencyIndex][0]:E15}");
             }
         }
 
@@ -149,12 +145,6 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
             }
         }
         
-        var s = _equation.F[0] / (_equation.A[0, 0] + _equation.Alpha[0]);
-        Console.WriteLine($"A = {_equation.A[0, 0]:E15}");
-        Console.WriteLine($"alpha = {_equation.Alpha[0]:E15}");
-        Console.WriteLine($"F = {_equation.F[0]:E15}");
-        Console.WriteLine($"delta sigma = {s:F10}");
-        return;
         var sigmaSeekDirection = _slaeSolver.Solve(_equation);
         _nextSigma = LinAl.LinearCombination(
             _currentSigma, sigmaSeekDirection, 
@@ -162,22 +152,41 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
             resultMemory: _nextSigma
         );
 
+        Logger.LogInformation("deltaSigma: {delta:E8}", sigmaSeekDirection);
+        Logger.LogInformation("nextSigma: {sigma:E8}", _nextSigma);
+
+        // change material on new
+        for (var sigmaIndex = 0; sigmaIndex < SigmaInitial.Length; sigmaIndex++)
+        {
+            _materials[FixedMaterialsCount + sigmaIndex].Sigma = _nextSigma[sigmaIndex];
+        }
+
         // direct task
         foreach (var (frequency, frequencyIndex) in Frequencies)
         {
             _nextNumericalFunc[frequencyIndex] = _directSolver.Solve(
                 frequency,
-                currentMaterialProvider,
+                materialProvider,
                 MeasuringPoints,
                 resultMemory: _nextNumericalFunc[frequencyIndex]
             );
         }
         var nextFunctional = ComputeFunctional(_nextSigma, _nextNumericalFunc);
+        Logger.LogInformation("nextFunctional: {nextFunctional:E8}", nextFunctional);
 
         if (nextFunctional >= prevFunctional)
         {
             Config.Betta /= 2;
+            Logger.LogInformation("betta decreased: {betta:E3}", Config.Betta);
+
+            // prevent material changes
+            for (var sigmaIndex = 0; sigmaIndex < SigmaInitial.Length; sigmaIndex++)
+            {
+                _materials[FixedMaterialsCount + sigmaIndex].Sigma = _currentSigma[sigmaIndex];
+            }
         }
+
+        Logger.LogInformation("successful step");
     }
 
     public double GetDerivativeStep(double sigma)
@@ -259,6 +268,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         }
 
         _directSolver.Allocate(grid);
+        _slaeSolver.Allocate(_equation);
     }
 }
 

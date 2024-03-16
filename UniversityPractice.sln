@@ -14,6 +14,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "InverseTask", "InverseTask\
 		{1643F7AA-48D6-4B56-A7DF-BE49FFE0D998} = {1643F7AA-48D6-4B56-A7DF-BE49FFE0D998}
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InverseTask.Tests", "InverseTask.Tests\InverseTask.Tests.csproj", "{4E60F553-E151-47CF-AE31-7FD7AEA165B7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,6 +38,10 @@ Global
 		{0E3539BE-1819-4637-A6BA-8F505BDF522E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0E3539BE-1819-4637-A6BA-8F505BDF522E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0E3539BE-1819-4637-A6BA-8F505BDF522E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E60F553-E151-47CF-AE31-7FD7AEA165B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E60F553-E151-47CF-AE31-7FD7AEA165B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E60F553-E151-47CF-AE31-7FD7AEA165B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E60F553-E151-47CF-AE31-7FD7AEA165B7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

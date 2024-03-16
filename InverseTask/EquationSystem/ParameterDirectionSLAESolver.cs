@@ -5,8 +5,8 @@ namespace InverseTask.EquationSystem;
 public class ParameterDirectionSLAESolver : IParameterDirectionSLAESolver
 {
     private readonly GaussZeidelSolver _solver;
-    private ComputedVector _rightSide;
-    private ComputedMatrix _matrix;
+    private ComputedVector _rightSide = null!;
+    private ComputedMatrix _matrix = null!;
 
     public ParameterDirectionSLAESolver(GaussZeidelSolver solver)
     {

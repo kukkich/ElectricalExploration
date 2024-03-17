@@ -4,7 +4,6 @@ using InverseTask.EquationSystem;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Serilog;
 using SharpMath.EquationsSystem.Solver;
 using SharpMath.FiniteElement.Materials.HarmonicWithoutChi;
@@ -42,8 +41,18 @@ void ConfigureServices(IServiceCollection services)
 
         return gaussZeidelConfig!;
     });
-    services.AddSingleton(configuration);
+    services.AddScoped<FunctionalOptimizerConfig>(provider =>
+    {
+        provider.GetService<IConfiguration>();
+        var functionalOptimizerConfig = configuration
+            .GetSection("App")
+            .GetSection("FunctionalOptimizer")
+            .Get<FunctionalOptimizerConfig>();
 
+        return functionalOptimizerConfig!;
+    });
+    services.AddSingleton(configuration);
+    
     services.AddScoped<GaussZeidelSolver>();
     services.AddScoped<ParameterDirectionSLAESolver>();
     
@@ -118,11 +127,11 @@ var result = new double[measuringPoints.Length];
 solver.Solve(frequency, materialProvider, measuringPoints, result);
 
 var optimizer = new FunctionalOptimizer(
-    new FunctionalOptimizerConfig {Betta = 1d, MaxIteration = 10, Precision = 1e-4},
+    provider.GetRequiredService<FunctionalOptimizerConfig>(),
     provider.GetRequiredService<ILogger<FunctionalOptimizer>>(),
     solver,
     provider.GetRequiredService<ParameterDirectionSLAESolver>()
-    );
+);
 
 var measurements = new Matrix(new double[1,result.Length]);
 for (var i = 0; i < result.Length; i++)

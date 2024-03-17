@@ -14,8 +14,10 @@ namespace InverseTask;
 
 public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
 {
-    public const double DerivativeStepScale = 0.2; 
-    
+    public const double DerivativeStepScale = 0.2;
+    public const double MaxParameterChangeRatio = 1.5;
+    public const double AlphaChangeRation = 1.5;
+
     private int FixedMaterialsCount => _materials.Length - SigmaInitial.Length;
 
     private readonly IDirectSolver _directSolver;
@@ -36,6 +38,8 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
     private Vector _nextSigma;
     private ParameterDirectionEquation _equation = null!;
     private Material[] _materials = null!;
+    private FromArrayMaterialProvider _materialProvider;
+    private double _currentFunctional;
 
     private Vector MeasuringPoints { get; set; } = null!;
     private Matrix Measurements { get; set; } = null!;
@@ -56,7 +60,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
     }
 
     public void Solve(
-        Grid<Point, Element> grid, 
+        Grid<Point, Element> grid,
         Vector measuringPoints,
         Matrix measurements,
         Vector frequencies,
@@ -65,6 +69,21 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         Material[] fixedMaterials
         )
     {
+        Initialize(grid, measuringPoints, measurements, frequencies, sigmaInitial, alpha, fixedMaterials);
+
+        // direct task
+        _currentFunctional = SolveDirectTask(_numericalFunc, SigmaInitial);
+
+        for (var i = 1; i <= Config.MaxIteration && _currentFunctional > Config.Precision; i++)
+        {
+            Iterate();
+            Logger.LogInformation("{iteration}-th successful step", i);
+        }
+    }
+
+    private void Initialize(Grid<Point, Element> grid, Vector measuringPoints, Matrix measurements, Vector frequencies, Vector sigmaInitial,
+        Vector alpha, Material[] fixedMaterials)
+    {
         MeasuringPoints = measuringPoints;
         Measurements = measurements;
         Frequencies = frequencies;
@@ -72,43 +91,91 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         Alpha = alpha;
 
         Allocate(grid, fixedMaterials);
-        var materialProvider = new FromArrayMaterialProvider(_materials);
+        _materialProvider = new FromArrayMaterialProvider(_materials);
+    }
 
-        // direct task
-        foreach (var (frequency, frequencyIndex) in Frequencies)
-        {
-            _numericalFunc[frequencyIndex] = _directSolver.Solve(
-                frequency,
-                materialProvider,
-                MeasuringPoints,
-                resultMemory: _numericalFunc[frequencyIndex]
-            );
-        }
-        var prevFunctional = ComputeFunctional(_currentSigma, _numericalFunc);
-
+    private void Iterate()
+    {
         // deviated direct tasks
-        for (var parameterIndex = 0; parameterIndex < SigmaInitial.Length; parameterIndex++)
+        SolveDeviatedParameterTasks();
+        
+        var anyParameterConstraintViolated = true;
+        while (anyParameterConstraintViolated)
         {
-            var sigma = _currentSigma[parameterIndex];
-            var deviation = GetDerivativeStep(sigma);
-            foreach (var (frequency, frequencyIndex) in Frequencies)
-            {
-                var deviatedMaterialProvider = new SigmaDeviatedMaterialProvider(
-                    materialProvider,
-                    deviation,
-                    FixedMaterialsCount + parameterIndex
-                );
+            var equation = FillParameterDirectionSLAE();
 
-                _deviatedNumericalFunc[parameterIndex][frequencyIndex] = _directSolver.Solve(
-                    frequency,
-                    deviatedMaterialProvider,
-                    MeasuringPoints,
-                    resultMemory: _deviatedNumericalFunc[parameterIndex][frequencyIndex]
-                );
+            var sigmaSeekDirection = _slaeSolver.Solve(equation);
+            _nextSigma = LinAl.LinearCombination(
+                _currentSigma, sigmaSeekDirection,
+                1d, Config.Betta,
+                resultMemory: _nextSigma
+            );
+
+            Logger.LogDebug("deltaSigma: {delta}", sigmaSeekDirection);
+            Logger.LogDebug("nextSigma: {sigma}", _nextSigma);
+
+            // direct task with new material
+            var nextFunctional = SolveDirectTask(_nextNumericalFunc, _nextSigma);
+
+            anyParameterConstraintViolated = CheckParametersConstraintsAndCorrectAlpha(_currentSigma, _nextSigma);
+
+            if (anyParameterConstraintViolated)
+            {
+                continue;
             }
+            #region Betta
+            // Todo implement betta changing
+            //if (nextFunctional >= _currentFunctional)
+            //{
+            //    Config.Betta /= 2;
+            //    Logger.LogInformation("betta decreased: {betta:E3}", Config.Betta);
+
+            //    // rollback material changes
+            //    ChangeMaterial(_currentSigma);
+            //}
+            #endregion
+
+            _currentFunctional = nextFunctional;
         }
 
-        // Fill equation
+        (_numericalFunc, _nextNumericalFunc) = (_nextNumericalFunc, _numericalFunc);
+        (_currentSigma, _nextSigma) = (_nextSigma, _currentSigma);
+    }
+
+    private bool CheckParametersConstraintsAndCorrectAlpha(Vector previousParameters, Vector nextParameters)
+    {
+        var anyConstraintViolated = false;
+
+        for (var parameterIndex = 0; parameterIndex < previousParameters.Length; parameterIndex++)
+        {
+            var previousParameter = previousParameters[parameterIndex];
+            var nextParameter = nextParameters[parameterIndex];
+            var changeRatio = previousParameter / nextParameter;
+
+            if (!(double.Max(changeRatio, 1d / changeRatio) > MaxParameterChangeRatio))
+            {
+                continue;
+            }
+
+            anyConstraintViolated = true;
+            Alpha[parameterIndex] *= AlphaChangeRation;
+        }
+
+        if (anyConstraintViolated)
+        {
+            Logger.LogInformation("Sigma constraints violated");
+            Logger.LogDebug("New Alpha: {sigma}", Alpha);
+        }
+        else
+        {
+            Logger.LogInformation("Sigma constraints passed");
+        }
+
+        return anyConstraintViolated;
+    }
+
+    private ParameterDirectionEquation FillParameterDirectionSLAE()
+    {
         for (var i = 0; i < SigmaInitial.Length; i++)
         {
             _equation.F[i] = 0;
@@ -144,54 +211,62 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
                 }
             }
         }
-        
-        var sigmaSeekDirection = _slaeSolver.Solve(_equation);
-        _nextSigma = LinAl.LinearCombination(
-            _currentSigma, sigmaSeekDirection, 
-            1d, Config.Betta, 
-            resultMemory: _nextSigma
-        );
 
-        Logger.LogInformation("deltaSigma: {delta:E8}", sigmaSeekDirection);
-        Logger.LogInformation("nextSigma: {sigma:E8}", _nextSigma);
+        return _equation;
+    }
 
-        // change material on new
-        for (var sigmaIndex = 0; sigmaIndex < SigmaInitial.Length; sigmaIndex++)
+    private void ChangeMaterial(Vector parametersSource)
+    {
+        for (var sigmaIndex = 0; sigmaIndex < parametersSource.Length; sigmaIndex++)
         {
-            _materials[FixedMaterialsCount + sigmaIndex].Sigma = _nextSigma[sigmaIndex];
+            _materials[FixedMaterialsCount + sigmaIndex].Sigma = parametersSource[sigmaIndex];
         }
+    }
 
-        // direct task
-        foreach (var (frequency, frequencyIndex) in Frequencies)
+    private void SolveDeviatedParameterTasks()
+    {
+        for (var parameterIndex = 0; parameterIndex < SigmaInitial.Length; parameterIndex++)
         {
-            _nextNumericalFunc[frequencyIndex] = _directSolver.Solve(
-                frequency,
-                materialProvider,
-                MeasuringPoints,
-                resultMemory: _nextNumericalFunc[frequencyIndex]
-            );
-        }
-        var nextFunctional = ComputeFunctional(_nextSigma, _nextNumericalFunc);
-        Logger.LogInformation("nextFunctional: {nextFunctional:E8}", nextFunctional);
-
-        if (nextFunctional >= prevFunctional)
-        {
-            Config.Betta /= 2;
-            Logger.LogInformation("betta decreased: {betta:E3}", Config.Betta);
-
-            // prevent material changes
-            for (var sigmaIndex = 0; sigmaIndex < SigmaInitial.Length; sigmaIndex++)
+            var sigma = _currentSigma[parameterIndex];
+            var deviation = GetDerivativeStep(sigma);
+            foreach (var (frequency, frequencyIndex) in Frequencies)
             {
-                _materials[FixedMaterialsCount + sigmaIndex].Sigma = _currentSigma[sigmaIndex];
+                var deviatedMaterialProvider = new SigmaDeviatedMaterialProvider(
+                    _materialProvider,
+                    deviation,
+                    FixedMaterialsCount + parameterIndex
+                );
+
+                _deviatedNumericalFunc[parameterIndex][frequencyIndex] = _directSolver.Solve(
+                    frequency,
+                    deviatedMaterialProvider,
+                    MeasuringPoints,
+                    resultMemory: _deviatedNumericalFunc[parameterIndex][frequencyIndex]
+                );
             }
         }
+    }
 
-        Logger.LogInformation("successful step");
+    private double SolveDirectTask(double[][] resultMemory, Vector parameter)
+    {
+        ChangeMaterial(parameter);
+
+        foreach (var (frequency, frequencyIndex) in Frequencies)
+        {
+            resultMemory[frequencyIndex] = _directSolver.Solve(
+                frequency,
+                _materialProvider,
+                MeasuringPoints,
+                resultMemory: resultMemory[frequencyIndex]
+            );
+        }
+
+        return ComputeFunctional(parameter, resultMemory);
     }
 
     public double GetDerivativeStep(double sigma)
     {
-        return 0.2;
+        return sigma * 0.1;
     }
 
     private double ComputeFunctional(Vector sigma, double[][] func)

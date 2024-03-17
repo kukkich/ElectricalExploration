@@ -22,7 +22,7 @@ public class GaussZeidelTest
             Relaxation = 1
         };
 
-        Solver = new GaussZeidelSolver(Config, NullLogger.Instance);
+        Solver = new GaussZeidelSolver(Config, NullLogger<GaussZeidelSolver>.Instance);
     }
 
     [Test]

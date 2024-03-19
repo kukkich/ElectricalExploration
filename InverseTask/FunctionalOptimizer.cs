@@ -40,13 +40,14 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
     private Material[] _materials = null!;
     private FromArrayMaterialProvider _materialProvider;
     private double _currentFunctional;
+    private double _functionalChangeRation;
 
     private Vector MeasuringPoints { get; set; } = null!;
     private Matrix Measurements { get; set; } = null!;
     private Vector Frequencies { get; set; } = null!;
     private Vector SigmaInitial { get; set; } = null!;
     private Vector Alpha { get; set; } = null!;
-
+    private Vector AlphaInitial { get; set; } = null!;
 
     public FunctionalOptimizer(
         FunctionalOptimizerConfig config,
@@ -73,11 +74,16 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
 
         // direct task
         _currentFunctional = SolveDirectTask(_numericalFunc, SigmaInitial);
-
-        for (var i = 1; i <= Config.MaxIteration && _currentFunctional > Config.Precision; i++)
+        _functionalChangeRation = double.PositiveInfinity;
+        Logger.LogDebug("initial sigma {sigma:E15}", _currentSigma);
+        for (var i = 1; i <= Config.MaxIteration &&
+                        _currentFunctional > Config.Precision &&
+                        Math.Abs(_functionalChangeRation - 1) > 1e-4
+                        ; i++)
         {
+            AlphaInitial.CopyTo(Alpha);
             Iterate();
-            Logger.LogInformation("{iteration}-th successful step", i);
+            Logger.LogDebug("{iteration}-th successful step. Functional ratio {functionalRation:E7}", i, _functionalChangeRation);
         }
     }
 
@@ -88,8 +94,8 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
         Measurements = measurements;
         Frequencies = frequencies;
         SigmaInitial = sigmaInitial;
-        Alpha = alpha;
-
+        AlphaInitial = alpha;
+        Alpha = AlphaInitial.Copy();
         Allocate(grid, fixedMaterials);
         _materialProvider = new FromArrayMaterialProvider(_materials);
     }
@@ -111,18 +117,12 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
                 resultMemory: _nextSigma
             );
 
-            Logger.LogDebug("deltaSigma: {delta}", sigmaSeekDirection);
-            Logger.LogDebug("nextSigma: {sigma}", _nextSigma);
+            Logger.LogDebug("deltaSigma: {delta:E7}", sigmaSeekDirection);
 
-            // direct task with new material
-            var nextFunctional = SolveDirectTask(_nextNumericalFunc, _nextSigma);
+            
 
             anyParameterConstraintViolated = CheckParametersConstraintsAndCorrectAlpha(_currentSigma, _nextSigma);
 
-            if (anyParameterConstraintViolated)
-            {
-                continue;
-            }
             #region Betta
             // Todo implement betta changing
             //if (nextFunctional >= _currentFunctional)
@@ -134,9 +134,12 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
             //    ChangeMaterial(_currentSigma);
             //}
             #endregion
-
-            _currentFunctional = nextFunctional;
         }
+        // direct task with new material
+        var nextFunctional = SolveDirectTask(_nextNumericalFunc, _nextSigma);
+        _functionalChangeRation = _currentFunctional / nextFunctional;
+        _currentFunctional = nextFunctional;
+        Logger.LogInformation("next sigma {sigma:E15}", _nextSigma);
 
         (_numericalFunc, _nextNumericalFunc) = (_nextNumericalFunc, _numericalFunc);
         (_currentSigma, _nextSigma) = (_nextSigma, _currentSigma);
@@ -163,12 +166,12 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
 
         if (anyConstraintViolated)
         {
-            Logger.LogInformation("Sigma constraints violated");
+            Logger.LogTrace("Sigma constraints violated");
             Logger.LogDebug("New Alpha: {sigma}", Alpha);
         }
         else
         {
-            Logger.LogInformation("Sigma constraints passed");
+            Logger.LogTrace("Sigma constraints passed");
         }
 
         return anyConstraintViolated;
@@ -227,6 +230,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
     {
         for (var parameterIndex = 0; parameterIndex < SigmaInitial.Length; parameterIndex++)
         {
+            // TODO решение при отклонении 2-го (последнего) параметра не меняется
             var sigma = _currentSigma[parameterIndex];
             var deviation = GetDerivativeStep(sigma);
             foreach (var (frequency, frequencyIndex) in Frequencies)
@@ -266,6 +270,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
 
     public double GetDerivativeStep(double sigma)
     {
+        // return 0.2;
         return sigma * 0.1;
     }
 
@@ -296,7 +301,7 @@ public class FunctionalOptimizer : Method<FunctionalOptimizerConfig>
             "Functional: {functional:E7} funcPunish: {funcPunish:E7} sigmaPunish: {sigmaPunish:E7}",
             functional, funcPunish, sigmaPunish
         );
-
+        Logger.LogInformation("{functional:E7}", functional);
         return functional;
     }
 

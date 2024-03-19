@@ -63,94 +63,236 @@ void ConfigureServices(IServiceCollection services)
         loggingBuilder.AddSerilog(dispose: true));
 }
 
-var services = new ServiceCollection();
-ConfigureServices(services);
-var provider = services.BuildServiceProvider();
+void RunSimpleTest()
+{
+    var services = new ServiceCollection();
+    ConfigureServices(services);
+    var provider = services.BuildServiceProvider();
+    var xAreaSize = 10_000d;
+    var xMax = 10_000d;
+    var air = new RectSection(
+        new Rectangle(
+            0, 0,
+            xMax, 5_000
+        ),
+        materialId: 0
+    );
+    var ground = new RectSection(
+        new Rectangle(
+            0, -200_000,
+            xMax, 199_000
+        ),
+        materialId: 1
+    );
+    var conductor = new RectSection(
+        new Rectangle(
+            0, -1_000,
+            xMax, 1_000
+        ),
+        materialId: 2
+    );
+    var areas = new AreasMaterialSetterFactory(
+        [conductor, ground, air],
+        defaultMaterialIdId: 1
+    );
+    const int nestingDegree = 1;
 
-var air = new RectSection(
-    new Rectangle(
-        0, 0,
-        10_000, 5_000
-    ),
-    materialId: 0
-);
-var ground = new RectSection(
-    new Rectangle(
-        0, -200_000,
-        10_000, 199_000
-    ),
-    materialId: 1
-);
-var conductor = new RectSection(
-    new Rectangle(
-        0, -1_000,
-        10_000, 1_000
-    ),
-    materialId: 2
-);
-var areas = new AreasMaterialSetterFactory(
-    [conductor, ground, air], 
-    defaultMaterialIdId: 1
-);
-const int nestingDegree = 1;
-
-var grid = new GridBuilder()
-    .SetXAxis(new AxisSplitParameter(
-        [0, 10_000], 
-        new UniformSplitter(50 * nestingDegree)
-    ))
-    .SetYAxis(new AxisSplitParameter(
-        [-200_000, -10_000, -1_000, 0, 5_000],
-        [
-            new ProportionalSplitter(50 * nestingDegree, 1d/1.05),
+    var grid = new GridBuilder()
+        .SetXAxis(new AxisSplitParameter(
+            [0, xMax],
+            new UniformSplitter(50 * nestingDegree)
+        ))
+        .SetYAxis(new AxisSplitParameter(
+            [-200_000, -10_000, -1_000, 0, 5_000],
+            [
+                new ProportionalSplitter(50 * nestingDegree, 1d/1.05),
             new ProportionalSplitter(50 * nestingDegree, 1d/1.05),
             new ProportionalSplitter(100 * nestingDegree, 1d/1.01),
             new ProportionalSplitter(50 * nestingDegree, 1.01)
-        ])
-    )
-    .SetMaterialSetterFactory(areas)
-    .Build();
+            ])
+        )
+        .SetMaterialSetterFactory(areas)
+        .Build();
 
-var solver = new DirectSolver(new LocalOptimalSchemeConfig());
-solver.Allocate(grid);
+    var solver = new DirectSolver(new LocalOptimalSchemeConfig());
+    solver.Allocate(grid);
 
-const double frequency = 1e2;
-const double lambda = 1d / DirectSolver.MagneticConstant;
+    const double frequency = 1e2;
+    const double lambda = 1d / DirectSolver.MagneticConstant;
 
-var materialProvider = new FromArrayMaterialProvider([
-    new Material(lambda, 0),
-    new Material(lambda, 1e-3),
-    new Material(lambda, 1)
-]);
-var measuringPoints = new Vector(4000);
-var result = new double[measuringPoints.Length];
-solver.Solve(frequency, materialProvider, measuringPoints, result);
+    var materialProvider = new FromArrayMaterialProvider([
+        new Material(lambda, 0),
+        new Material(lambda, 1e-3),
+        new Material(lambda, 1e0)
+    ]);
+    var measuringPoints = new Vector(4000);
+    var result = new double[measuringPoints.Length];
+    solver.Solve(frequency, materialProvider, measuringPoints, result);
 
-var optimizer = new FunctionalOptimizer(
-    provider.GetRequiredService<FunctionalOptimizerConfig>(),
-    provider.GetRequiredService<ILogger<FunctionalOptimizer>>(),
-    solver,
-    provider.GetRequiredService<ParameterDirectionSLAESolver>()
-);
+    var optimizer = new FunctionalOptimizer(
+        provider.GetRequiredService<FunctionalOptimizerConfig>(),
+        provider.GetRequiredService<ILogger<FunctionalOptimizer>>(),
+        solver,
+        provider.GetRequiredService<ParameterDirectionSLAESolver>()
+    );
 
-var measurements = new Matrix(new double[1,result.Length]);
-for (var i = 0; i < result.Length; i++)
-{
-    measurements[0, i] = result[i];
+    var measurements = new Matrix(new double[1, result.Length]);
+    for (var i = 0; i < result.Length; i++)
+    {
+        measurements[0, i] = result[i];
+    }
+
+    Console.WriteLine($"R* = {result[0]:E15}");
+
+    optimizer.Solve(
+        grid,
+        measuringPoints,
+        measurements,
+        new Vector(frequency),
+        sigmaInitial: new Vector(0.1),
+        alpha: new Vector(1e-14),
+        fixedMaterials: [
+            new Material(lambda, 0),
+        new Material(lambda, 1e-3)
+        ]
+    );
+    Console.WriteLine(result[0]);
 }
 
-Console.WriteLine($"R* = {result[0]:E15}");
+void RunFewAreasTest()
+{
+    var services = new ServiceCollection();
+    ConfigureServices(services);
+    var provider = services.BuildServiceProvider();
+    var xAreaSize = 10_000d;
+    var xMax = 30_000d;
+    var air = new RectSection(
+        new Rectangle(
+            0, 0,
+            xMax, 5_000
+        ),
+        materialId: 0
+    );
+    var ground = new RectSection(
+        new Rectangle(
+            0, -200_000,
+            xMax, 199_000
+        ),
+        materialId: 1
+    );
+    List<RectSection> conductors = [
+        new RectSection(
+            new Rectangle(
+                0, -1_000,
+                xAreaSize, 1_000
+            ),
+            materialId: 2
+        ),
+        new RectSection(
+            new Rectangle(
+                xAreaSize, -1_000,
+                xAreaSize, 1_000
+            ),
+            materialId: 3
+        ),
+        new RectSection(
+            new Rectangle(
+                2*xAreaSize, -1_000,
+                xAreaSize, 1_000
+            ),
+            materialId: 4
+        ),
+    ];
+    
+    var areas = new AreasMaterialSetterFactory(
+        [conductors[0], conductors[1], conductors[2], ground, air],
+        defaultMaterialIdId: 1
+    );
+    const int nestingDegree = 1;
 
-optimizer.Solve(
-    grid,
-    measuringPoints,
-    measurements,
-    new Vector(frequency),
-    sigmaInitial: new Vector(1 - 0.2),
-    alpha: new Vector(1e-7),
-    fixedMaterials: [
+    var grid = new GridBuilder()
+        .SetXAxis(new AxisSplitParameter(
+            [0, xAreaSize, 2*xAreaSize, xMax],
+            [
+                new UniformSplitter(30 * nestingDegree),
+                new UniformSplitter(30 * nestingDegree),
+                new UniformSplitter(30 * nestingDegree),
+            ]
+        ))
+        .SetYAxis(new AxisSplitParameter(
+            [-200_000, -10_000, -1_000, 0, 5_000],
+            [
+                new ProportionalSplitter(50 * nestingDegree, 1d/1.05),
+            new ProportionalSplitter(50 * nestingDegree, 1d/1.05),
+            new ProportionalSplitter(100 * nestingDegree, 1d/1.01),
+            new ProportionalSplitter(50 * nestingDegree, 1.01)
+            ])
+        )
+        .SetMaterialSetterFactory(areas)
+        .Build();
+
+    var solver = new DirectSolver(new LocalOptimalSchemeConfig());
+    solver.Allocate(grid);
+
+    var frequencies = new Vector(new AxisSplitParameter(
+            [Math.Pow(10, 0.45d), Math.Pow(10, 2.1d)],
+            new UniformSplitter(5)
+        )
+        .CreateAxis()
+        .ToArray());
+    const double lambda = 1d / DirectSolver.MagneticConstant;
+
+    var materialProvider = new FromArrayMaterialProvider([
         new Material(lambda, 0),
-        new Material(lambda, 1e-3)
-    ]
-);
-Console.WriteLine(result[0]);
+        new Material(lambda, 1e-3),
+        new Material(lambda, 1e-2),
+        new Material(lambda, 1e0),
+        new Material(lambda, 1e-1)
+    ]);
+    var measuringPoints = new Vector(new AxisSplitParameter(
+            [0, xMax],
+            new UniformSplitter(20)
+        )
+        .CreateAxis()
+        .ToArray());
+    var result = new double[frequencies.Length][];
+    for (var i = 0; i < result.Length; i++)
+    {
+        result[i] = new double[measuringPoints.Length];
+        solver.Solve(frequencies[i], materialProvider, measuringPoints, result[i]);
+    }
+
+    var optimizer = new FunctionalOptimizer(
+        provider.GetRequiredService<FunctionalOptimizerConfig>(),
+        provider.GetRequiredService<ILogger<FunctionalOptimizer>>(),
+        solver,
+        provider.GetRequiredService<ParameterDirectionSLAESolver>()
+    );
+
+    var measurements = new Matrix(new double[frequencies.Length, measuringPoints.Length]);
+    for (var i = 0; i < frequencies.Length; i++)
+    {
+        for (var j = 0; j < measuringPoints.Length; j++)
+        {
+            measurements[i, j] = result[i][j];
+        }
+    }
+
+    Console.WriteLine($"R* = {result[0]:E15}");
+
+    optimizer.Solve(
+        grid,
+        measuringPoints,
+        measurements,
+        frequencies,
+        sigmaInitial: new Vector(7e-3, 5e-1, 5e-2),
+        alpha: Vector.Create(conductors.Count, _ => 1e-14),
+        fixedMaterials: [
+            new Material(lambda, 0),
+            new Material(lambda, 1e-3),
+        ]
+    );
+    Console.WriteLine(result[0]);
+}
+
+RunFewAreasTest();

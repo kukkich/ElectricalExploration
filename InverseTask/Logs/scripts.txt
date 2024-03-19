@@ -1,0 +1,3 @@
+functional: python log_extractor.py log.log "Functional:\s*([-\d.E+]+)\s*funcPunish:" functional.log
+sigma punish: python log_extractor.py log.log "sigmaPunish:\s*([-\d.E+]+)\s*" sigma_punish.log
+sigma: python log_extractor.py log.log "(?:initial sigma|next sigma)\s+(.*)" sigma.log

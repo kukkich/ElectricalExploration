@@ -30,14 +30,16 @@ public class GaussZeidelSolver : Method<GaussZeidelConfig>, IAllocationRequired<
         _matrix = matrix;
         _rightSide = rightSide;
         _rightSideNorm = rightSide.Norm;
+        _currentSolution.Nullify();
 
         var currentPrecision = GetRelativeDiscrepancy(_currentSolution);
-
-        for (var i = 0; i < Config.MaxIteration && currentPrecision > Config.Precision; i++)
+        var i = 0;
+        for (; i < Config.MaxIteration && currentPrecision > Config.Precision; i++)
         {
             currentPrecision = Iterate();
-            Logger.LogInformation("[{iteration}] {relativeDiscrepancy:E8} -- relativeDiscrepancy", i, currentPrecision);
+            Logger.LogDebug("[{iteration}] {relativeDiscrepancy:E8} -- relativeDiscrepancy", i, currentPrecision);
         }
+        Logger.LogInformation("GZ ended: [{iteration}] {relativeDiscrepancy:E8} -- relativeDiscrepancy", i, currentPrecision);
 
         return _currentSolution;
     }
@@ -50,7 +52,10 @@ public class GaussZeidelSolver : Method<GaussZeidelConfig>, IAllocationRequired<
 
             for (var j = 0; j < Dimensions; j++)
             {
-                step -= _matrix[row, j] * _currentSolution[j];
+                var a = _matrix[row, j];
+                var b = _currentSolution[j];
+                var value = a * b;
+                step -= value;
             }
 
             step += _rightSide[row];
@@ -64,6 +69,7 @@ public class GaussZeidelSolver : Method<GaussZeidelConfig>, IAllocationRequired<
 
     private double GetRelativeDiscrepancy(IReadonlyVector<double> solution)
     {
+        _discrepancyVector.Nullify();
         _discrepancyVector = LinAl.Multiply(_matrix, solution, _discrepancyVector);
         _discrepancyVector = LinAl.Subtract(_rightSide, _discrepancyVector);
         return _discrepancyVector.Norm / _rightSideNorm;
